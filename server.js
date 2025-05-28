@@ -91,6 +91,7 @@ app.get("/api/employees/:id", (req, res) => {
 
 // 📋 Chưa check-in
 app.get("/api/employee/unchecked", (req, res) => {
+     console.log("🔍 Truy vấn danh sách chưa  check-in");
     const unchecked = Object.entries(employees)
         .filter(([_, emp]) => !emp.checkedIn)
         .map(([id, emp]) => ({ id, name: emp.name, unit: emp.unit, team: emp.team, phone: emp.phone }));
@@ -105,6 +106,7 @@ app.get("/api/employee/unchecked", (req, res) => {
 
 // ✅ Đã check-in
 app.get("/api/employee/checked", (req, res) => {
+    console.log("🔍 Truy vấn danh sách đã check-in");
     const checked = Object.entries(employees)
         .filter(([_, emp]) => emp.checkedIn)
         .map(([id, emp]) => ({ id, name: emp.name, unit: emp.unit, team: emp.team, phone: emp.phone }));
