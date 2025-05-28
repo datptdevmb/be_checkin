@@ -114,6 +114,7 @@ app.get("/api/employee/checked", (req, res) => {
     res.json({ success: true, count: checked.length, data: checked });
 });
 
+/////
 // 🔘 Check-in
 app.get("/api/checkin/:id", (req, res) => {
     const id = req.params.id.trim().toUpperCase();
