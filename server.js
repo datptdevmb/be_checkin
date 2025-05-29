@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const xlsx = require("xlsx");
 const path = require("path");
+const fs = require("fs");
+
 
 const app = express();
 const PORT = 3001;
@@ -11,6 +13,7 @@ app.use(express.json());
 
 const filePath = path.join(__dirname, "data/employees.xlsx");
 const outputPath = path.join(__dirname, "data/employees_checkin.xlsx");
+const scoreFilePath = path.join(__dirname, "data/team_scores.xlsx");
 const sheetName = "Sheet1";
 
 const workbook = xlsx.readFile(filePath);
@@ -41,12 +44,12 @@ dataRows.forEach((row) => {
     }
 });
 
-// 🔐 Biến cờ an toàn
+
 let isWriting = false;
 
-// ✅ Hàm ghi dữ liệu an toàn
+
 function saveToExcel() {
-    if (isWriting) return; // Tránh ghi trùng lặp
+    if (isWriting) return;
     isWriting = true;
 
     try {
@@ -75,10 +78,10 @@ function saveToExcel() {
     }
 }
 
-// ⏲️ Auto backup mỗi 8 giây
+
 setInterval(saveToExcel, 8000);
 
-// 📌 API tra cứu
+
 app.get("/api/employees/:id", (req, res) => {
     const id = req.params.id.trim().toUpperCase();
     const emp = employees[id];
@@ -89,9 +92,9 @@ app.get("/api/employees/:id", (req, res) => {
     }
 });
 
-// 📋 Chưa check-in
+
 app.get("/api/employee/unchecked", (req, res) => {
-     console.log("🔍 Truy vấn danh sách chưa  check-in");
+    console.log("🔍 Truy vấn danh sách chưa  check-in");
     const unchecked = Object.entries(employees)
         .filter(([_, emp]) => !emp.checkedIn)
         .map(([id, emp]) => ({ id, name: emp.name, unit: emp.unit, team: emp.team, phone: emp.phone }));
@@ -104,18 +107,8 @@ app.get("/api/employee/unchecked", (req, res) => {
     });
 });
 
-// ✅ Đã check-in
-app.get("/api/employee/checked", (req, res) => {
-    console.log("🔍 Truy vấn danh sách đã check-in");
-    const checked = Object.entries(employees)
-        .filter(([_, emp]) => emp.checkedIn)
-        .map(([id, emp]) => ({ id, name: emp.name, unit: emp.unit, team: emp.team, phone: emp.phone }));
 
-    res.json({ success: true, count: checked.length, data: checked });
-});
 
-/////
-// 🔘 Check-in
 app.get("/api/checkin/:id", (req, res) => {
     const id = req.params.id.trim().toUpperCase();
 
@@ -133,6 +126,93 @@ app.get("/api/checkin/:id", (req, res) => {
     res.json({ success: true, message: "✅ Check-in thành công." });
 });
 
+// -------------------- API CHẤM ĐIỂM -------------------- //
+function appendScore(teamId, judgeId, scorePart) {
+    let rows = [
+        [
+            "Đội",
+            "Giám khảo",
+            "📚 Tính mới",
+            "📚 Tính khả thi",
+            "📚 Tính hiệu quả",
+            "📚 Phong cách trình bày",
+            "🎯 Phù hợp chủ đề",
+            "🎯 Sáng tạo",
+            "🎯 Biểu cảm",
+            "Tổng điểm",
+            "Thời gian"
+        ]
+    ];
+
+    if (fs.existsSync(scoreFilePath)) {
+        const wbOld = xlsx.readFile(scoreFilePath);
+        const wsOld = wbOld.Sheets["Scores"];
+        const data = xlsx.utils.sheet_to_json(wsOld, { header: 1, defval: "" });
+
+        rows = [data[0], ...data.slice(1).filter(row => !(row[0] == teamId && row[1] == judgeId))];
+    }
+
+    const row = [
+        teamId,
+        judgeId,
+        scorePart.part1?.understanding || 0,
+        scorePart.part1?.logic || 0,
+        scorePart.part1?.expression || 0,
+        scorePart.part1?.expression1 || 0,
+        scorePart.part2?.teamwork || 0,
+        scorePart.part2?.creativity || 0,
+        scorePart.part2?.completion || 0,
+    ];
+
+    const total = row.slice(2).reduce((a, b) => a + parseFloat(b || 0), 0);
+    row.push(total.toFixed(2));
+    row.push(new Date().toLocaleString("vi-VN"));
+
+    rows.push(row);
+
+    const wb = xlsx.utils.book_new();
+    const ws = xlsx.utils.aoa_to_sheet(rows);
+    xlsx.utils.book_append_sheet(wb, ws, "Scores");
+    xlsx.writeFile(wb, scoreFilePath);
+
+    console.log("✅ Ghi điểm thành công:", { teamId, judgeId });
+}
+
+// ✅ Nhận điểm từ client
+app.post("/api/score/:teamId/:judgeId", (req, res) => {
+    const { teamId, judgeId } = req.params;
+    const score = req.body;
+
+    if (!score.part1 && !score.part2) {
+        return res.status(400).json({ success: false, message: "Thiếu dữ liệu part1 hoặc part2." });
+    }
+
+    try {
+        appendScore(teamId, judgeId, score);
+        res.json({ success: true, message: "✅ Đã lưu điểm vào Excel." });
+    } catch (err) {
+        console.error("❌ Lỗi khi ghi điểm:", err.message);
+        res.status(500).json({ success: false, message: "Lỗi server khi ghi điểm." });
+    }
+});
+
+// ✅ API trả danh sách điểm đã chấm
+app.get("/api/scores", (req, res) => {
+    try {
+        if (!fs.existsSync(scoreFilePath)) {
+            return res.json({ success: true, data: [] });
+        }
+
+        const workbook = xlsx.readFile(scoreFilePath);
+        const sheet = workbook.Sheets["Scores"];
+        const data = xlsx.utils.sheet_to_json(sheet, { defval: "" });
+
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error("❌ Lỗi đọc file điểm:", err.message);
+        res.status(500).json({ success: false, message: "Lỗi server khi đọc điểm." });
+    }
+});
 app.listen(PORT, () => {
     console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);
 });
