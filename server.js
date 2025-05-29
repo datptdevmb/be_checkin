@@ -201,7 +201,7 @@ app.get("/api/scores", (req, res) => {
     }
 });
 
-app.get("/api/scores/reset", (req, res) => {
+app.get("/api/resetscores", (req, res) => {
     try {
         if (fs.existsSync(scoreFilePath)) {
             fs.unlinkSync(scoreFilePath);
@@ -214,7 +214,7 @@ app.get("/api/scores/reset", (req, res) => {
         res.status(500).json({ success: false, message: "Không xoá được file." });
     }
 });
-app.get("/api/checkin/reset", (req, res) => {
+app.get("/api/resetcheckin", (req, res) => {
     const checkinPath = path.join(__dirname, "data/employees_checkin.xlsx");
 
     try {
