@@ -121,29 +121,45 @@ function appendScore(teamId, judgeId, scorePart) {
             "🎯 Phù hợp chủ đề", "🎯 Sáng tạo", "🎯 Biểu cảm", "Tổng điểm", "Thời gian"
         ]];
 
+        let existingRow = null;
+
         if (fs.existsSync(scoreFilePath)) {
             const wbOld = xlsx.readFile(scoreFilePath);
             const wsOld = wbOld.Sheets["Scores"];
             const data = xlsx.utils.sheet_to_json(wsOld, { header: 1, defval: "" });
-            rows = [data[0], ...data.slice(1).filter(row => !(row[0] == teamId && row[1] == judgeId))];
+
+            // Header
+            rows = [data[0]];
+
+            for (let i = 1; i < data.length; i++) {
+                const row = data[i];
+                if (row[0] == teamId && row[1] == judgeId) {
+                    existingRow = row;
+                    continue; // Bỏ dòng cũ
+                }
+                rows.push(row); // Giữ dòng khác
+            }
         }
 
-        const row = [
+        // Lấy điểm cũ nếu có
+        const old = existingRow || [];
+        const newRow = [
             teamId,
             judgeId,
-            scorePart.part1?.understanding || 0,
-            scorePart.part1?.logic || 0,
-            scorePart.part1?.expression || 0,
-            scorePart.part1?.expression1 || 0,
-            scorePart.part2?.teamwork || 0,
-            scorePart.part2?.creativity || 0,
-            scorePart.part2?.completion || 0,
+            scorePart.part1?.understanding ?? old[2] ?? 0,
+            scorePart.part1?.logic ?? old[3] ?? 0,
+            scorePart.part1?.expression ?? old[4] ?? 0,
+            scorePart.part1?.expression1 ?? old[5] ?? 0,
+            scorePart.part2?.teamwork ?? old[6] ?? 0,
+            scorePart.part2?.creativity ?? old[7] ?? 0,
+            scorePart.part2?.completion ?? old[8] ?? 0,
         ];
 
-        const total = row.slice(2).reduce((a, b) => a + parseFloat(b || 0), 0);
-        row.push(total.toFixed(2));
-        row.push(new Date().toLocaleString("vi-VN"));
-        rows.push(row);
+        const total = newRow.slice(2).reduce((a, b) => a + parseFloat(b || 0), 0);
+        newRow.push(total.toFixed(2));
+        newRow.push(new Date().toLocaleString("vi-VN"));
+
+        rows.push(newRow);
 
         const wb = xlsx.utils.book_new();
         const ws = xlsx.utils.aoa_to_sheet(rows);
@@ -156,6 +172,7 @@ function appendScore(teamId, judgeId, scorePart) {
         isWritingScore = false;
     }
 }
+
 
 app.post("/api/score/:teamId/:judgeId", (req, res) => {
     const { teamId, judgeId } = req.params;
