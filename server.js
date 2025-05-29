@@ -214,8 +214,7 @@ app.get("/api/scores/reset", (req, res) => {
         res.status(500).json({ success: false, message: "Không xoá được file." });
     }
 });
-
-app.delete("/api/checkin/reset", (req, res) => {
+app.get("/api/checkin/reset", (req, res) => {
     const checkinPath = path.join(__dirname, "data/employees_checkin.xlsx");
 
     try {
@@ -230,6 +229,7 @@ app.delete("/api/checkin/reset", (req, res) => {
         res.status(500).json({ success: false, message: "Không xoá được file check-in." });
     }
 });
+
 
 app.listen(PORT, () => {
     console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);
