@@ -16,6 +16,26 @@ const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
 }
+const checkinPath = path.join(dataDir, "employees_checkin.xlsx");
+if (fs.existsSync(checkinPath)) {
+    try {
+        const wbCheckin = xlsx.readFile(checkinPath);
+        const wsCheckin = wbCheckin.Sheets[sheetName];
+        const checkinRows = xlsx.utils.sheet_to_json(wsCheckin, { header: 1, range: 1 }); // bỏ header
+
+        checkinRows.slice(1).forEach((row) => {
+            const code = row[1]?.toString().trim();
+            const checkedIn = row[6]?.toString().toUpperCase() === "TRUE";
+            if (code && employees[code]) {
+                employees[code].checkedIn = checkedIn;
+            }
+        });
+
+        console.log("🔁 Đã phục hồi trạng thái check-in từ file.");
+    } catch (err) {
+        console.error("❌ Không thể đọc file check-in:", err.message);
+    }
+}
 
 const filePath = path.join(dataDir, "employees.xlsx");
 const outputPath = path.join(dataDir, "employees_checkin.xlsx");
